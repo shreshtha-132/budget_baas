@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+venv/
+ENV/
+env/
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Python egg
+*.egg-info/
+*.egg
+
+# Pipenv / Poetry
+*.lock
+
+# Test results
+*.log
+*.out
+
+# Environment variables
+.env
