@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from databases import Database
 
@@ -19,4 +19,3 @@ SessionLocal = sessionmaker(bind=engine,autoflush=False,autocommit=False)
 # ORM Base class
 Base = declarative_base()
 
-# metadata = MetaData()
