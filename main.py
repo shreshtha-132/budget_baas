@@ -5,7 +5,8 @@ from pydantic import BaseModel
 from db import database,SessionLocal,engine,Base  # ← import the `Database` instance
 from contextlib import asynccontextmanager
 import models, schemas
-from typing import List
+from typing import List, Optional
+from sqlalchemy import func
 
 
 
@@ -87,3 +88,60 @@ async def home():
 async def healthcheck():
     return JSONResponse(content={"status":"ok","message":"API is healthy"})
 
+@app.post("/expenses/",response_model=schemas.ExpenseRead, status_code=status.HTTP_201_CREATED)
+def create_expense(exp: schemas.ExpenseCreate, db: Session = Depends(get_db)):
+    #ensuring category exists
+    if not db.get(models.Category, exp.category_id):
+        raise HTTPException(status_code=404, detail="Category not found")
+    #create and commit
+    db_exp = models.Expense(**exp.model_dump())
+    db.add(db_exp)
+    db.commit()
+    db.refresh(db_exp)
+    return db_exp
+
+@app.get("/expenses/{expense_id}",response_model=schemas.ExpenseRead)
+def read_expense(expense_id: int, db:Session = Depends(get_db)):
+    exp = db.get(models.Expense, expense_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    return exp
+
+@app.put("/expenses/{expense_id}", response_model=schemas.ExpenseRead)
+def update_expense(expense_id:int, updates:schemas.ExpenseCreate, db: Session = Depends(get_db)):
+    exp = db.get(models.Expense, expense_id)
+    if not exp:
+        raise HTTPException(status_code=404,detail="Expense not found")
+    for k,v in updates.model_dump(exclude_unset=True).items():
+        setattr(exp,k,v)
+    db.commit()
+    db.refresh(exp)
+    return exp
+
+
+@app.delete("/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_expense(expense_id:int,db:Session=Depends(get_db)):
+    exp = db.get(models.Expense, expense_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    db.delete(exp)
+    db.commit()
+    return
+
+@app.post("/income/", response_model=schemas.IncomeRead, status_code=status.HTTP_201_CREATED)
+def set_income(data: schemas.IncomeCreate, db:Session = Depends(get_db)):
+    inc = db.get(models.Income,data.month)
+    if inc:
+        inc.amount = data.amount
+    else:
+        inc = models.Income(**data.model_dump())
+        db.add(inc)
+    db.commit()
+    return inc
+
+@app.get("/income/{month}",response_model=schemas.IncomeRead)
+def get_income(month:str,db:Session=Depends(get_db)):
+    inc = db.get(models.Income,month)
+    if not inc:
+        raise HTTPException(status_code=404, detail="Income not set for this month")
+    return inc

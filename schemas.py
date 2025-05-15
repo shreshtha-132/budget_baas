@@ -40,3 +40,16 @@ class ExpenseRead(ExpenseBase):
 
     class Config:
         from_attributes = True
+
+
+#income schemas
+class IncomeBase(BaseModel):
+    month: str = Field(...,example="2025-05")
+    amount: float = Field(...,ge=0,example=40800)
+
+class IncomeCreate(IncomeBase):
+    pass
+
+class IncomeRead(IncomeBase):
+    class Config:
+        from_attributes=True

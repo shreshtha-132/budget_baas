@@ -27,3 +27,9 @@ class Expense(Base):
     description = Column(String,nullable=True)
 
     category = relationship("Category",back_populates="expenses")
+
+class Income(Base):
+    __tablename__="incomes"
+
+    month = Column(String, primary_key=True)
+    amount = Column(Float, nullable=False)
