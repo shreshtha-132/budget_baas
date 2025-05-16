@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 import models, schemas
 from typing import List, Optional
 from sqlalchemy import func
+import re
+from datetime import date
 
 
 
@@ -145,3 +147,52 @@ def get_income(month:str,db:Session=Depends(get_db)):
     if not inc:
         raise HTTPException(status_code=404, detail="Income not set for this month")
     return inc
+
+@app.get("/summary/{month}")
+def monthly_summary(month:str,db:Session=Depends(get_db)):
+    
+    if not re.match(r"^\d{4}-\d{2}$", month):
+        raise HTTPException(status_code=400, detail="Month must be in YYYY-MM format")
+
+    #get total income for month
+    income = db.get(models.Income, month)
+    if not income:
+        raise HTTPException(status_code=404,detail="Income not set for this month")
+    
+    #aggregate expenses
+
+    results = (db.query(
+        models.Category.id,
+        models.Category.name,
+        models.Category.limit_amount,
+        func.coalesce(func.sum(models.Expense.amount), 0).label("spent")
+    ).outerjoin(models.Expense).filter(func.strftime("%Y-%m", models.Expense.date) == month).group_by(models.Category.id).all())
+
+    #build the summary response
+    categories_summary = []
+    total_spent = 0
+
+    for category in results:
+        balance = category.limit_amount - category.spent
+        total_spent+=category.spent
+        categories_summary.append({
+            "category":category.name,
+            "limit":category.limit_amount,
+            "spent":category.spent,
+            "balance":balance})
+        
+    return {
+        "month":month,
+        "income":income.amount,
+        "total_spent":total_spent,
+        "remaining": income.amount - total_spent,
+        "categories": categories_summary
+    }
+
+
+#when user doesnt specify month then return the summary for default month i.e current
+@app.get("/summary")
+def current_month_summary(db: Session = Depends(get_db)):
+    today = date.today()
+    month = today.strftime("%Y-%m")
+    return monthly_summary(month, db)
