@@ -1,0 +1,7 @@
+The quickest way to reset locally was:
+
+rm budget.db && python create_tables.py
+
+rm budget.db → deletes the SQLite file
+
+python create_tables.py → runs your script that does Base.metadata.create_all(bind=engine)

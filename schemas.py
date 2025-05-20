@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 import datetime
 
 class CategoryBase(BaseModel):
@@ -24,6 +24,27 @@ class CategoryRead(CategoryBase):
         #tells Pydantic it can read SQLAlchemy objects directly.
         from_attributes = True
 
+class CategorySummary(BaseModel):
+    category: str
+    limit: float
+    spent: float
+    balance: float
+    over_limit: bool
+
+    class Config:
+        from_attributes = True
+
+class Overview(BaseModel):
+    month: str
+    income:float
+    total_spent: float
+    remaining: float
+    categories: List[CategorySummary]
+
+    class Config:
+        from_attributes = True
+        
+
 # —— Expense Schemas ——
 
 class ExpenseBase(BaseModel):
@@ -38,6 +59,15 @@ class ExpenseCreate(ExpenseBase):
 class ExpenseRead(ExpenseBase):
     id:int
 
+    class Config:
+        from_attributes = True
+
+class ExpenseUpdate(BaseModel):
+    category_id: Optional[int] = Field(None, example=1)
+    amount: Optional[float]    = Field(None, ge=0, example=250.75)
+    date: Optional[datetime.date] = Field(None, example="2025-05-14")
+    description: Optional[str] = Field(None, example="Lunch at canteen")
+    
     class Config:
         from_attributes = True
 

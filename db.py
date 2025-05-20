@@ -1,9 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from databases import Database
+import os
 
 # 1) Database URL
-DATABASE_URL = "sqlite:///./budget.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./budget.db")
 
 # 2) Async Database instance (to be injected into FastAPI)
 database = Database(DATABASE_URL)

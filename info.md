@@ -166,4 +166,24 @@ Here’s a focused 5-day, \~2 hours/day roadmap to build your Budget Maintenance
 | Documentation               | FastAPI OpenAPI, Swagger UI, Redoc           |
 | Deployment                  | Docker, basic PaaS (Heroku/Railway)          |
 
-By the end of Day 5 you’ll have a fully-functional, tested, documented, and deployed Budget Maintenance API—ready for a front-end or mobile client to hook into!
+## Budget Maintenance Backend API
+
+**Overview**  
+A 5‑day, project‑based crash course building a production‑ready FastAPI application to manage personal budgets.
+
+**Key Features**  
+- **Category Management**: Full CRUD for spending categories (`/categories` endpoints)  
+- **Expense Tracking**: Add, view, update, delete expenses; filter by month (`/expenses`)  
+- **Monthly Income**: Set and retrieve monthly income (`/income`)  
+- **Budget Summary**: Aggregated per‑category spending vs. limits plus overall income/spend balance (`/summary`)  
+- **Alerts**: Automatically flag categories that exceed their budget limits  
+- **Validation & Error Handling**: Pydantic field validation, FastAPI exception handlers, global 500‑error JSON responses  
+- **Middleware**: CORS support, request‑timing logs for performance monitoring  
+- **Automated Tests**: pytest + FastAPI TestClient suite covering core flows  
+- **Documentation & Deployment**: Swagger/OpenAPI docs, Dockerized deployment (Python 3.11‑slim, Uvicorn), PaaS‑ready
+
+**Tech Stack**  
+`Python` • `FastAPI` • `Pydantic (v2)` • `SQLAlchemy ORM` • `SQLite / aiosqlite` • `Docker` • `pytest` • `GitHub Actions` (CI)
+
+**Duration & Format**  
+5‑day, ~2 hrs/day: Crash‑course videos + hands‑on project work, following a structured roadmap from setup through testing and containerized deployment.

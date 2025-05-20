@@ -9,7 +9,10 @@ from typing import List, Optional
 from sqlalchemy import func
 import re
 from datetime import date
-
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.requests import Request
+import time
+from fastapi import APIRouter
 
 
 
@@ -36,6 +39,42 @@ def get_db():
         db.close()
     
 app = FastAPI(title="Budget Maintenance BaaS",lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+#request‑logging middleware is a piece of code that sits in front of all routes and does two things
+#for each incoming http request
+#1) measures how long app takes to handle the request
+#2) logs the http method,path,response status, and duration
+# This is useful for spotting slow endpoints or just getting basic traffic metrics in console.
+
+@app.middleware("http") # wraps every http request
+async def log_requests(request:Request,call_next):
+    start = time.time()
+    response = await call_next(request)  # <-- this invokes this routes (next piece of flow)
+    process_time = (time.time()-start)*1000
+    print(f"{request.method}{request.url.path} - {response.status_code} - {process_time:.2f}ms")
+    return response
+
+#Catch any unhandled exceptions and return a clean JSON response:
+@app.exception_handler(Exception)
+async def global_exception_handler(request:Request,exc:Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error-please try again later"},
+    )
+
+@app.post("/reset",summary="Reset the entire database")
+def reset_database():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    return JSONResponse(content={"detail":"Database has been reset (all tables dropped and recreated)."})
 
 @app.post("/categories/",response_model=schemas.CategoryRead, status_code=status.HTTP_201_CREATED)
 def create_category(cat: schemas.CategoryCreate, db: Session = Depends(get_db)):
@@ -109,8 +148,19 @@ def read_expense(expense_id: int, db:Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Expense not found")
     return exp
 
+@app.get("/expenses/",response_model=List[schemas.ExpenseRead],tags=["Expenses"],summary="List expenses, optionally filtered by month")
+def read_expenses(month: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(models.Expense)
+    if month:
+        year, m = map(int, month.split("-"))
+        from datetime import date
+        start = date(year, m, 1)
+        end = date(year + (m == 12), m % 12 + 1, 1)
+        query = query.filter(models.Expense.date >= start, models.Expense.date < end)
+    return query.all()
+
 @app.put("/expenses/{expense_id}", response_model=schemas.ExpenseRead)
-def update_expense(expense_id:int, updates:schemas.ExpenseCreate, db: Session = Depends(get_db)):
+def update_expense(expense_id:int, updates:schemas.ExpenseUpdate, db: Session = Depends(get_db)):
     exp = db.get(models.Expense, expense_id)
     if not exp:
         raise HTTPException(status_code=404,detail="Expense not found")
@@ -148,7 +198,7 @@ def get_income(month:str,db:Session=Depends(get_db)):
         raise HTTPException(status_code=404, detail="Income not set for this month")
     return inc
 
-@app.get("/summary/{month}")
+@app.get("/summary/{month}",response_model=schemas.Overview, summary="Monthly Budget Overview")
 def monthly_summary(month:str,db:Session=Depends(get_db)):
     
     if not re.match(r"^\d{4}-\d{2}$", month):
@@ -179,7 +229,9 @@ def monthly_summary(month:str,db:Session=Depends(get_db)):
             "category":category.name,
             "limit":category.limit_amount,
             "spent":category.spent,
-            "balance":balance})
+            "balance":balance,
+            "over_limit": category.spent > category.limit_amount
+            })
         
     return {
         "month":month,
