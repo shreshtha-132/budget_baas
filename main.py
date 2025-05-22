@@ -70,13 +70,13 @@ async def global_exception_handler(request:Request,exc:Exception):
         content={"detail": "Internal Server Error-please try again later"},
     )
 
-@app.post("/reset",summary="Reset the entire database")
+@app.post("/v1/reset",tags=["Admin"],summary="Reset the entire database")
 def reset_database():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     return JSONResponse(content={"detail":"Database has been reset (all tables dropped and recreated)."})
 
-@app.post("/categories/",response_model=schemas.CategoryRead, status_code=status.HTTP_201_CREATED)
+@app.post("/v1/categories/",tags=["Categories"],summary="Create a new spending category",response_model=schemas.CategoryRead,response_description="The newly created category object", status_code=status.HTTP_201_CREATED)
 def create_category(cat: schemas.CategoryCreate, db: Session = Depends(get_db)):
     #check uniqueness
     existing = db.query(models.Category).filter(models.Category.name==cat.name).first()
@@ -88,18 +88,18 @@ def create_category(cat: schemas.CategoryCreate, db: Session = Depends(get_db)):
     db.refresh(db_cat)
     return db_cat
 
-@app.get("/categories/",response_model=List[schemas.CategoryRead])
+@app.get("/v1/categories/",tags=["Categories"],summary="List all spending categories",response_model=List[schemas.CategoryRead])
 def read_categories(skip: int =0,limit:int=100,db:Session=Depends(get_db)):
     return db.query(models.Category).offset(skip).limit(limit).all()
 
-@app.get("/categories/{category_id}",response_model=schemas.CategoryRead)
+@app.get("/v1/categories/{category_id}",tags=["Categories"],summary="List specific category",response_model=schemas.CategoryRead)
 def read_category(category_id:int,db:Session=Depends(get_db)):
     cat = db.query(models.Category).get(category_id)
     if not cat:
         raise HTTPException(status_code=404,detail="Category not found")
     return cat
 
-@app.put("/categories/{category_id}",response_model=schemas.CategoryRead)
+@app.put("/v1/categories/{category_id}",tags=["Categories"],summary="Update specific category",response_model=schemas.CategoryRead)
 def update_category(category_id:int,updates:schemas.CategoryUpdate,db:Session=Depends(get_db)):
     cat = db.query(models.Category).get(category_id)
     if not cat:
@@ -111,7 +111,7 @@ def update_category(category_id:int,updates:schemas.CategoryUpdate,db:Session=De
     db.refresh(cat)
     return cat
 
-@app.delete("/categories/{category_id}",status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/v1/categories/{category_id}",tags=["Categories"],summary="Delete specific category",status_code=status.HTTP_204_NO_CONTENT)
 def delete_category(category_id:int,db:Session=Depends(get_db)):
     cat = db.query(models.Category).get(category_id)
     if not cat:
@@ -121,15 +121,15 @@ def delete_category(category_id:int,db:Session=Depends(get_db)):
     return
 
 
-@app.get("/",summary="Home")
+@app.get("/v1/",tags=["System"],summary="Home")
 async def home():
     return JSONResponse(content={"message":"Hi you are welcome to budget maintenance API"})
 
-@app.get("/health",summary="Health Check")
+@app.get("/v1/health",tags=["System"],summary="Health Check")
 async def healthcheck():
     return JSONResponse(content={"status":"ok","message":"API is healthy"})
 
-@app.post("/expenses/",response_model=schemas.ExpenseRead, status_code=status.HTTP_201_CREATED)
+@app.post("/v1/expenses/",tags=["Expenses"], summary="Add an expense",response_model=schemas.ExpenseRead, status_code=status.HTTP_201_CREATED)
 def create_expense(exp: schemas.ExpenseCreate, db: Session = Depends(get_db)):
     #ensuring category exists
     if not db.get(models.Category, exp.category_id):
@@ -141,14 +141,14 @@ def create_expense(exp: schemas.ExpenseCreate, db: Session = Depends(get_db)):
     db.refresh(db_exp)
     return db_exp
 
-@app.get("/expenses/{expense_id}",response_model=schemas.ExpenseRead)
+@app.get("/v1/expenses/{expense_id}",tags=["Expenses"], summary="Get an specific expense",response_model=schemas.ExpenseRead)
 def read_expense(expense_id: int, db:Session = Depends(get_db)):
     exp = db.get(models.Expense, expense_id)
     if not exp:
         raise HTTPException(status_code=404, detail="Expense not found")
     return exp
 
-@app.get("/expenses/",response_model=List[schemas.ExpenseRead],tags=["Expenses"],summary="List expenses, optionally filtered by month")
+@app.get("/v1/expenses/",response_model=List[schemas.ExpenseRead],tags=["Expenses"],summary="List expenses, optionally filtered by month")
 def read_expenses(month: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(models.Expense)
     if month:
@@ -159,7 +159,7 @@ def read_expenses(month: Optional[str] = None, db: Session = Depends(get_db)):
         query = query.filter(models.Expense.date >= start, models.Expense.date < end)
     return query.all()
 
-@app.put("/expenses/{expense_id}", response_model=schemas.ExpenseRead)
+@app.put("/v1/expenses/{expense_id}",tags=["Expenses"], summary="Update specific expense", response_model=schemas.ExpenseRead)
 def update_expense(expense_id:int, updates:schemas.ExpenseUpdate, db: Session = Depends(get_db)):
     exp = db.get(models.Expense, expense_id)
     if not exp:
@@ -171,7 +171,7 @@ def update_expense(expense_id:int, updates:schemas.ExpenseUpdate, db: Session = 
     return exp
 
 
-@app.delete("/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/v1/expenses/{expense_id}", tags=["Expenses"], summary="Delete specific expense",status_code=status.HTTP_204_NO_CONTENT)
 def delete_expense(expense_id:int,db:Session=Depends(get_db)):
     exp = db.get(models.Expense, expense_id)
     if not exp:
@@ -180,7 +180,7 @@ def delete_expense(expense_id:int,db:Session=Depends(get_db)):
     db.commit()
     return
 
-@app.post("/income/", response_model=schemas.IncomeRead, status_code=status.HTTP_201_CREATED)
+@app.post("/v1/income/", tags=["Income"], summary="Set or update monthly income",response_model=schemas.IncomeRead, status_code=status.HTTP_201_CREATED)
 def set_income(data: schemas.IncomeCreate, db:Session = Depends(get_db)):
     inc = db.get(models.Income,data.month)
     if inc:
@@ -191,14 +191,14 @@ def set_income(data: schemas.IncomeCreate, db:Session = Depends(get_db)):
     db.commit()
     return inc
 
-@app.get("/income/{month}",response_model=schemas.IncomeRead)
+@app.get("/v1/income/{month}",tags=["Income"], summary="Get specific monthly income",response_model=schemas.IncomeRead)
 def get_income(month:str,db:Session=Depends(get_db)):
     inc = db.get(models.Income,month)
     if not inc:
         raise HTTPException(status_code=404, detail="Income not set for this month")
     return inc
 
-@app.get("/summary/{month}",response_model=schemas.Overview, summary="Monthly Budget Overview")
+@app.get("/v1/summary/{month}",tags=["Summary"],response_model=schemas.Overview, summary="Monthly Budget Overview")
 def monthly_summary(month:str,db:Session=Depends(get_db)):
     
     if not re.match(r"^\d{4}-\d{2}$", month):
@@ -243,7 +243,9 @@ def monthly_summary(month:str,db:Session=Depends(get_db)):
 
 
 #when user doesnt specify month then return the summary for default month i.e current
-@app.get("/summary")
+@app.get("/v1/summary",tags=["Summary"],summary="Current month budget overview",
+    response_model=schemas.Overview,
+    response_description="Overview of the current month’s income, spending, and balances",)
 def current_month_summary(db: Session = Depends(get_db)):
     today = date.today()
     month = today.strftime("%Y-%m")

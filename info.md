@@ -187,3 +187,9 @@ A 5‑day, project‑based crash course building a production‑ready FastAPI ap
 
 **Duration & Format**  
 5‑day, ~2 hrs/day: Crash‑course videos + hands‑on project work, following a structured roadmap from setup through testing and containerized deployment.
+
+
+May 22:- 
+
+1)Employed Github Actions for running pytest automatically whenever we push the code.
+2)Added tags and /v1/ before API endpoints for clarity
