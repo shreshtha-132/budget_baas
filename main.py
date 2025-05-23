@@ -121,7 +121,7 @@ def delete_category(category_id:int,db:Session=Depends(get_db)):
     return
 
 
-@app.get("/v1/",tags=["System"],summary="Home")
+@app.get("/",tags=["System"],summary="Home")
 async def home():
     return JSONResponse(content={"message":"Hi you are welcome to budget maintenance API"})
 

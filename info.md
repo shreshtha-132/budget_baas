@@ -193,3 +193,37 @@ May 22:-
 
 1)Employed Github Actions for running pytest automatically whenever we push the code.
 2)Added tags and /v1/ before API endpoints for clarity
+3) Dockerisation
+   a)sudo docker build -t shreshtxa/budget-baas:latest . ( only once to build image)
+   b)sudo docker run -d -p 8000:80 --name budget-baas-container shreshtxa/budget-baas:latest
+      ( to create container,need to do multiple times)
+   to stop
+   c) # Stop and remove the old container if still present
+      sudo docker rm -f budget-baas-container
+
+   d) stopping the container:-
+      sudo docker stop budget-baas-container
+   e) starting the container:-
+      sudo docker start budget-baas-container
+   f) name all the containers
+      sudo docker ps -a
+   g) Debug or inspect something
+      Use docker exec or docker logs
+
+
+When code changes:
+
+# a) Rebuild the image
+sudo docker build -t shreshtxa/budget-baas:latest .
+
+# b) Stop & remove the old container (if running)
+sudo docker rm -f budget-baas-container
+
+# c) Create and run a new container
+sudo docker run -d -p 8000:80 --name budget-baas-container shreshtxa/budget-baas:latest
+
+# d) running containers 
+sudo docker ps
+
+# e) all containers
+sudo docker ps -a
