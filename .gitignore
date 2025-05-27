@@ -27,3 +27,4 @@ env/
 
 # Environment variables
 .env
+firebase_budget_baas.json
