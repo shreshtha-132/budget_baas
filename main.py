@@ -1,4 +1,4 @@
-from fastapi import FastAPI,Depends,HTTPException,status
+from fastapi import FastAPI,Depends,HTTPException,status, Header   
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -12,7 +12,23 @@ from datetime import date
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.requests import Request
 import time
+import firebase_admin
+from firebase_admin import credentials, auth
 from fastapi import APIRouter
+
+#firebase setup
+
+def get_current_user_id(authorization: str = Header(...))->str:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Auth Header")
+    
+    id_token = authorization.split(" ")[1]
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token["uid"]
+        return uid
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
 
 
@@ -77,31 +93,31 @@ def reset_database():
     return JSONResponse(content={"detail":"Database has been reset (all tables dropped and recreated)."})
 
 @app.post("/v1/categories/",tags=["Categories"],summary="Create a new spending category",response_model=schemas.CategoryRead,response_description="The newly created category object", status_code=status.HTTP_201_CREATED)
-def create_category(cat: schemas.CategoryCreate, db: Session = Depends(get_db)):
+def create_category(cat: schemas.CategoryCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     #check uniqueness
-    existing = db.query(models.Category).filter(models.Category.name==cat.name).first()
+    existing = db.query(models.Category).filter(models.Category.user_id==user_id,models.Category.name==cat.name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Category Already Exists")
-    db_cat = models.Category(**cat.model_dump())
+    db_cat = models.Category(**cat.model_dump(), user_id=user_id)
     db.add(db_cat)
     db.commit()
     db.refresh(db_cat)
     return db_cat
 
 @app.get("/v1/categories/",tags=["Categories"],summary="List all spending categories",response_model=List[schemas.CategoryRead])
-def read_categories(skip: int =0,limit:int=100,db:Session=Depends(get_db)):
-    return db.query(models.Category).offset(skip).limit(limit).all()
+def read_categories(skip: int =0,limit:int=100,db:Session=Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    return db.query(models.Category).filter(models.Category.user_id==user_id).offset(skip).limit(limit).all()
 
 @app.get("/v1/categories/{category_id}",tags=["Categories"],summary="List specific category",response_model=schemas.CategoryRead)
-def read_category(category_id:int,db:Session=Depends(get_db)):
-    cat = db.query(models.Category).get(category_id)
+def read_category(category_id:int,db:Session=Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    cat = db.query(models.Category).filter(models.Category.id==category_id,models.Category.user_id==user_id).first()
     if not cat:
         raise HTTPException(status_code=404,detail="Category not found")
     return cat
 
 @app.put("/v1/categories/{category_id}",tags=["Categories"],summary="Update specific category",response_model=schemas.CategoryRead)
-def update_category(category_id:int,updates:schemas.CategoryUpdate,db:Session=Depends(get_db)):
-    cat = db.query(models.Category).get(category_id)
+def update_category(category_id:int,updates:schemas.CategoryUpdate,db:Session=Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    cat = db.query(models.Category).filter(models.Category.id==category_id,models.Category.user_id==user_id).first()
     if not cat:
         raise HTTPException(status_code=404,detail="Category not found")
     for field, value in updates.model_dump(exclude_unset=True).items():
@@ -112,8 +128,8 @@ def update_category(category_id:int,updates:schemas.CategoryUpdate,db:Session=De
     return cat
 
 @app.delete("/v1/categories/{category_id}",tags=["Categories"],summary="Delete specific category",status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(category_id:int,db:Session=Depends(get_db)):
-    cat = db.query(models.Category).get(category_id)
+def delete_category(category_id:int,db:Session=Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    cat = db.query(models.Category).filter(models.Category.id==category_id,models.Category.user_id==user_id).first()
     if not cat:
         raise HTTPException(status_code=404,detail="Category not found")
     db.delete(cat)
@@ -129,28 +145,30 @@ async def home():
 async def healthcheck():
     return JSONResponse(content={"status":"ok","message":"API is healthy"})
 
+#here
 @app.post("/v1/expenses/",tags=["Expenses"], summary="Add an expense",response_model=schemas.ExpenseRead, status_code=status.HTTP_201_CREATED)
-def create_expense(exp: schemas.ExpenseCreate, db: Session = Depends(get_db)):
+def create_expense(exp: schemas.ExpenseCreate, db: Session = Depends(get_db),user_id: str = Depends(get_current_user_id)):
     #ensuring category exists
-    if not db.get(models.Category, exp.category_id):
+    category = db.query(models.Category).filter_by(id=exp.category_id, user_id=user_id).first()
+    if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     #create and commit
-    db_exp = models.Expense(**exp.model_dump())
+    db_exp = models.Expense(**exp.model_dump(), user_id=user_id)
     db.add(db_exp)
     db.commit()
     db.refresh(db_exp)
     return db_exp
 
 @app.get("/v1/expenses/{expense_id}",tags=["Expenses"], summary="Get an specific expense",response_model=schemas.ExpenseRead)
-def read_expense(expense_id: int, db:Session = Depends(get_db)):
-    exp = db.get(models.Expense, expense_id)
+def read_expense(expense_id: int, db:Session = Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    exp = db.query(models.Expense).filter_by(id=expense_id, user_id=user_id).first()
     if not exp:
         raise HTTPException(status_code=404, detail="Expense not found")
     return exp
 
 @app.get("/v1/expenses/",response_model=List[schemas.ExpenseRead],tags=["Expenses"],summary="List expenses, optionally filtered by month")
-def read_expenses(month: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(models.Expense)
+def read_expenses(month: Optional[str] = None, db: Session = Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    query = db.query(models.Expense).filter_by(user_id=user_id)
     if month:
         year, m = map(int, month.split("-"))
         from datetime import date
@@ -160,8 +178,8 @@ def read_expenses(month: Optional[str] = None, db: Session = Depends(get_db)):
     return query.all()
 
 @app.put("/v1/expenses/{expense_id}",tags=["Expenses"], summary="Update specific expense", response_model=schemas.ExpenseRead)
-def update_expense(expense_id:int, updates:schemas.ExpenseUpdate, db: Session = Depends(get_db)):
-    exp = db.get(models.Expense, expense_id)
+def update_expense(expense_id:int, updates:schemas.ExpenseUpdate, db: Session = Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    exp = db.query(models.Expense).filter_by(id=expense_id, user_id=user_id).first()
     if not exp:
         raise HTTPException(status_code=404,detail="Expense not found")
     for k,v in updates.model_dump(exclude_unset=True).items():
@@ -172,8 +190,8 @@ def update_expense(expense_id:int, updates:schemas.ExpenseUpdate, db: Session = 
 
 
 @app.delete("/v1/expenses/{expense_id}", tags=["Expenses"], summary="Delete specific expense",status_code=status.HTTP_204_NO_CONTENT)
-def delete_expense(expense_id:int,db:Session=Depends(get_db)):
-    exp = db.get(models.Expense, expense_id)
+def delete_expense(expense_id:int,db:Session=Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    exp = db.query(models.Expense).filter_by(id=expense_id, user_id=user_id).first()
     if not exp:
         raise HTTPException(status_code=404, detail="Expense not found")
     db.delete(exp)
@@ -181,31 +199,31 @@ def delete_expense(expense_id:int,db:Session=Depends(get_db)):
     return
 
 @app.post("/v1/income/", tags=["Income"], summary="Set or update monthly income",response_model=schemas.IncomeRead, status_code=status.HTTP_201_CREATED)
-def set_income(data: schemas.IncomeCreate, db:Session = Depends(get_db)):
-    inc = db.get(models.Income,data.month)
+def set_income(data: schemas.IncomeCreate, db:Session = Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    inc = db.query(models.Income).filter_by(user_id=user_id, month=data.month).first()
     if inc:
         inc.amount = data.amount
     else:
-        inc = models.Income(**data.model_dump())
+        inc = models.Income(**data.model_dump(),user_id=user_id)
         db.add(inc)
     db.commit()
     return inc
 
 @app.get("/v1/income/{month}",tags=["Income"], summary="Get specific monthly income",response_model=schemas.IncomeRead)
-def get_income(month:str,db:Session=Depends(get_db)):
-    inc = db.get(models.Income,month)
+def get_income(month:str,db:Session=Depends(get_db),user_id: str = Depends(get_current_user_id)):
+    inc = db.query(models.Income).filter_by(user_id=user_id, month=month).first()
     if not inc:
         raise HTTPException(status_code=404, detail="Income not set for this month")
     return inc
 
 @app.get("/v1/summary/{month}",tags=["Summary"],response_model=schemas.Overview, summary="Monthly Budget Overview")
-def monthly_summary(month:str,db:Session=Depends(get_db)):
+def monthly_summary(month:str,db:Session=Depends(get_db),user_id: str = Depends(get_current_user_id)):
     
     if not re.match(r"^\d{4}-\d{2}$", month):
         raise HTTPException(status_code=400, detail="Month must be in YYYY-MM format")
 
     #get total income for month
-    income = db.get(models.Income, month)
+    income = db.query(models.Income).filter_by(user_id=user_id, month=month).first()
     if not income:
         raise HTTPException(status_code=404,detail="Income not set for this month")
     
@@ -216,7 +234,7 @@ def monthly_summary(month:str,db:Session=Depends(get_db)):
         models.Category.name,
         models.Category.limit_amount,
         func.coalesce(func.sum(models.Expense.amount), 0).label("spent")
-    ).outerjoin(models.Expense).filter(func.strftime("%Y-%m", models.Expense.date) == month).group_by(models.Category.id).all())
+    ).outerjoin(models.Expense).filter(models.Category.user_id == user_id).filter(func.strftime("%Y-%m", models.Expense.date) == month).group_by(models.Category.id).all())
 
     #build the summary response
     categories_summary = []
@@ -246,7 +264,7 @@ def monthly_summary(month:str,db:Session=Depends(get_db)):
 @app.get("/v1/summary",tags=["Summary"],summary="Current month budget overview",
     response_model=schemas.Overview,
     response_description="Overview of the current month’s income, spending, and balances",)
-def current_month_summary(db: Session = Depends(get_db)):
+def current_month_summary(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     today = date.today()
     month = today.strftime("%Y-%m")
-    return monthly_summary(month, db)
+    return monthly_summary(month, db, user_id)

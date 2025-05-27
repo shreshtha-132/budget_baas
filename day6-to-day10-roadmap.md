@@ -190,3 +190,14 @@ Start working on a new version (v2) while users continue testing v1.
 
 5. **Deploy Preview Build (Optional)**
    - Use Railway preview deployment for `v2-dev` branch.
+
+
+Working Logs:-
+
+May 24th:-
+
+1) add user_id to support multiuser in this.
+
+May 27th:-
+
+1) added user id and ran the unit tests. Next is to hit the api with valid bearer and test.

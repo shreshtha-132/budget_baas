@@ -189,6 +189,28 @@ A 5‑day, project‑based crash course building a production‑ready FastAPI ap
 5‑day, ~2 hrs/day: Crash‑course videos + hands‑on project work, following a structured roadmap from setup through testing and containerized deployment.
 
 
+
+
+When code changes:
+
+# a) Rebuild the image
+sudo docker build -t shreshtxa/budget-baas:latest .
+
+# b) Stop & remove the old container (if running)
+sudo docker rm -f budget-baas-container
+
+# c) Create and run a new container
+sudo docker run -d -p 8000:80 --name budget-baas-container shreshtxa/budget-baas:latest
+
+# d) running containers 
+sudo docker ps
+
+# e) all containers
+sudo docker ps -a
+
+# f) Stop & remove the old container (stopped)
+sudo docker rm budget-baas-container
+
 May 22:- 
 
 1)Employed Github Actions for running pytest automatically whenever we push the code.
@@ -210,20 +232,7 @@ May 22:-
    g) Debug or inspect something
       Use docker exec or docker logs
 
+May 23:-
 
-When code changes:
 
-# a) Rebuild the image
-sudo docker build -t shreshtxa/budget-baas:latest .
 
-# b) Stop & remove the old container (if running)
-sudo docker rm -f budget-baas-container
-
-# c) Create and run a new container
-sudo docker run -d -p 8000:80 --name budget-baas-container shreshtxa/budget-baas:latest
-
-# d) running containers 
-sudo docker ps
-
-# e) all containers
-sudo docker ps -a

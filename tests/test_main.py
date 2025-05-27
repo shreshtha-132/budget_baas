@@ -14,8 +14,21 @@ Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 from main import app  # now that env and schema are set
+from fastapi import Depends
+
+#mock the auth dependency
+
+
+from main import get_current_user_id
+
+def override_get_current_user_id():
+    return "test_user_id"
+
 
 client = TestClient(app)
+
+app.dependency_overrides[get_current_user_id] = override_get_current_user_id
+
 
 def test_category_expense_income_summary():
     # 1) Create category
